@@ -7,20 +7,15 @@ import (
 	"time"
 	"unsafe"
 
+	// Until https://github.com/lxn/walk/pull/228 is merged
 	"github.com/MakeNowJust/hotkey"
 	"github.com/lxn/walk"
-	. "github.com/lxn/walk/declarative"
 	"github.com/lxn/win"
 )
 
 // NoRepeat is a flag for RegisterHotKey.
 // It is not defined by the hotkey library.
 const NoRepeat = 0x4000
-
-// App is a thing
-type App struct {
-	*walk.MainWindow
-}
 
 func movemouse(x, y int) {
 	input := []win.MOUSE_INPUT{
@@ -42,23 +37,67 @@ func movemouse(x, y int) {
 	//fmt.Printf(" => %d (lastError: %d)\n", i, win.GetLastError())
 }
 
-func keyboard() {
-	input := []win.KEYBD_INPUT{
-		{
+func typeText(text string) {
+	input := make([]win.KEYBD_INPUT, len(text)*2)
+
+	for i, value := range text {
+		keydown := win.KEYBD_INPUT{
 			Type: win.INPUT_KEYBOARD,
 			Ki: win.KEYBDINPUT{
-				WVk:     'O',
-				DwFlags: 0,
+				WScan:   uint16(value),
+				DwFlags: win.KEYEVENTF_UNICODE,
 			},
-		},
-		{
-			Type: win.INPUT_KEYBOARD,
-			Ki: win.KEYBDINPUT{
-				WVk:     'O',
-				DwFlags: win.KEYEVENTF_KEYUP,
-			},
-		},
+		}
+
+		keyup := keydown // copy of keydown
+		keyup.Ki.DwFlags |= win.KEYEVENTF_KEYUP
+
+		input[i*2] = keydown
+		input[i*2+1] = keyup
 	}
+
+	//fmt.Printf("sendinput(%d, %#v, %d)\n", uint32(len(input)), input, int32(unsafe.Sizeof(input[0])))
+	count := win.SendInput(uint32(len(input)), unsafe.Pointer(&input[0]), int32(unsafe.Sizeof(input[0])))
+
+	if int(count) != len(input) {
+		fmt.Printf("SendInput failed. %d of %d items sent.\n", count, len(input))
+	}
+}
+
+func typeKey(shortcut walk.Shortcut) {
+	var keydown []win.KEYBD_INPUT
+	if shortcut.Modifiers&walk.ModShift > 0 {
+		keydown = append(keydown, win.KEYBD_INPUT{
+			Type: win.INPUT_KEYBOARD,
+			Ki:   win.KEYBDINPUT{WVk: uint16(walk.KeyShift)},
+		})
+	}
+	if shortcut.Modifiers&walk.ModControl > 0 {
+		keydown = append(keydown, win.KEYBD_INPUT{
+			Type: win.INPUT_KEYBOARD,
+			Ki:   win.KEYBDINPUT{WVk: uint16(walk.KeyControl)},
+		})
+	}
+	if shortcut.Modifiers&walk.ModAlt > 0 {
+		keydown = append(keydown, win.KEYBD_INPUT{
+			Type: win.INPUT_KEYBOARD,
+			Ki:   win.KEYBDINPUT{WVk: uint16(walk.KeyAlt)},
+		})
+	}
+
+	keydown = append(keydown, win.KEYBD_INPUT{
+		Type: win.INPUT_KEYBOARD,
+		Ki:   win.KEYBDINPUT{WVk: uint16(shortcut.Key)},
+	})
+
+	keyup := make([]win.KEYBD_INPUT, len(keydown))
+
+	copy(keyup, keydown)
+	for _, k := range keyup {
+		k.Ki.DwFlags = win.KEYEVENTF_KEYUP
+	}
+
+	input := append(keyup, keydown...)
 
 	count := win.SendInput(uint32(len(input)), unsafe.Pointer(&input[0]), int32(unsafe.Sizeof(input[0])))
 
@@ -67,7 +106,7 @@ func keyboard() {
 	}
 }
 
-func hotkeys(app *App) {
+func hotkeys() {
 	hk := hotkey.New()
 
 	// Quoting https://msdn.microsoft.com/en-us/library/windows/desktop/dd375731(v=vs.85).aspx
@@ -82,35 +121,13 @@ func hotkeys(app *App) {
 		// > The SetActiveWindow function activates a window, but not if the application is in the
 		// > background. The window will be brought into the foreground (top of Z-Order) if its
 		// > application is in the foreground when the system activates the window. "
-		win.SetForegroundWindow(app.MainWindow.Handle())
-		app.Activate()
+		//win.SetForegroundWindow(app.MainWindow.Handle())
+		//app.Activate()
+		Start()
 	})
 }
 
 func main() {
-	app := &App{}
-	hotkeys(app)
-
-	MainWindow{
-		Title:    "SCREAMO",
-		AssignTo: &app.MainWindow,
-		MinSize:  Size{Width: 600, Height: 400},
-		Layout:   VBox{},
-		MenuItems: []MenuItem{
-			Menu{
-				Text: "&Operations",
-				Items: []MenuItem{
-					Action{
-						Text:     "Hello",
-						Shortcut: Shortcut{Key: walk.KeyO},
-						OnTriggered: func() {
-							movemouse(10, 10)
-							<-time.After(3 * time.Second)
-							keyboard()
-						},
-					},
-				},
-			},
-		},
-	}.Run()
+	hotkeys()
+	<-time.After(1 * time.Minute)
 }
