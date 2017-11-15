@@ -1,4 +1,4 @@
-package main
+package denon
 
 import (
 	"encoding/xml"
@@ -6,8 +6,8 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
-	"os"
 	"strconv"
+	"time"
 
 	"github.com/huin/goupnp/dcps/av1"
 	"go.uber.org/zap"
@@ -25,6 +25,8 @@ func init() {
 type Denon struct {
 	hostname     string
 	masterVolume float32
+
+	queryTicker *time.Ticker
 }
 
 func (denon *Denon) Query() (err error) {
@@ -51,19 +53,19 @@ func (denon *Denon) Query() (err error) {
 
 	item := DenonItem{}
 	xml.Unmarshal(body, &item)
-	denon.observe(&item)
+	denon.processQuery(&item)
 
 	return
 }
 
-func (denon *Denon) observe(item *DenonItem) {
+func (denon *Denon) processQuery(item *DenonItem) {
 	text := item.DenonMasterVolume.DenonValue[0].Text
 	if text == "--" {
 		denon.masterVolume = 0
 	} else {
 		i, err := strconv.ParseFloat(text, 32)
 		if err != nil {
-			logger.Warnw("Observed unexpected master volume?", "value", text, "error", err)
+			logger.Warnw("Unexpected master volume value?", "value", text, "error", err)
 		} else {
 			denon.masterVolume = convertVolume(float32(i))
 		}
@@ -97,10 +99,28 @@ func (denon *Denon) Command(command string) {
 	}
 }
 
-func main() {
-	defer logger.Sync()
+func (denon *Denon) watch() {
+	if denon.queryTicker != nil {
+		denon.queryTicker.Stop()
+		denon.queryTicker = nil
+	}
 
+	denon.queryTicker = time.NewTicker(time.Second * 2)
+	go denon.observe()
+}
+
+func (denon *Denon) observe() {
+	for range denon.queryTicker.C {
+		err := denon.Query()
+		if err != nil {
+			logger.Error("Failed querying Denon AVR")
+		}
+	}
+}
+
+func Discover() (denon *Denon) {
 	clients, _, _ := av1.NewAVTransport1Clients()
+
 	// XXX: Verify if the AV1 location is a valid Denon AVR.
 	// XXX: This can be done by fetching the Location (description.xml) and looking for AVR in the modelName.
 	if len(clients) == 0 {
@@ -111,18 +131,8 @@ func main() {
 	avr := clients[0]
 	fmt.Printf("r: %#v\n", avr.Location.Hostname())
 
-	denon := Denon{hostname: avr.Location.Hostname()}
+	denon = &Denon{hostname: avr.Location.Hostname()}
 
-	for i, arg := range os.Args {
-		if i == 0 {
-			continue
-		}
-		denon.Command(arg)
-	}
-
-	err := denon.Query()
-	if err != nil {
-		logger.Error("Failed querying Denon AVR")
-	}
-	fmt.Printf("Volume: %f\n", denon.masterVolume)
+	denon.watch()
+	return
 }

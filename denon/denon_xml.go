@@ -1,4 +1,4 @@
-package main
+package denon
 
 type DenonChidleyRoot314159 struct {
 	DenonItem *DenonItem `xml:" item,omitempty" json:"item,omitempty"`
