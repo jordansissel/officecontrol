@@ -23,13 +23,16 @@ func init() {
 
 // Denon is an interface to a networked Denon AVR
 type Denon struct {
-	hostname     string
-	masterVolume float32
+	hostname string
 
 	queryTicker *time.Ticker
 }
 
-func (denon *Denon) Query() (err error) {
+type DenonStatus struct {
+	MasterVolume float32
+}
+
+func (denon *Denon) Query() (DenonStatus, error) {
 	endpoint := url.URL{
 		Scheme: "http",
 		Host:   denon.hostname,
@@ -40,7 +43,7 @@ func (denon *Denon) Query() (err error) {
 
 	if err != nil {
 		logger.Errorw("Failed sending command to Denon AVR", "endpoint", endpoint)
-		return
+		return DenonStatus{}, err
 	}
 
 	defer response.Body.Close()
@@ -48,28 +51,28 @@ func (denon *Denon) Query() (err error) {
 
 	if err != nil {
 		logger.Errorw("Failure reading response from Denon AVR", "endpoint", endpoint, "error", err)
-		return
+		return DenonStatus{}, err
 	}
 
 	item := DenonItem{}
 	xml.Unmarshal(body, &item)
-	denon.processQuery(&item)
-
-	return
+	return processQuery(&item), nil
 }
 
-func (denon *Denon) processQuery(item *DenonItem) {
+func processQuery(item *DenonItem) (result DenonStatus) {
 	text := item.DenonMasterVolume.DenonValue[0].Text
 	if text == "--" {
-		denon.masterVolume = 0
+		result.MasterVolume = 0
 	} else {
 		i, err := strconv.ParseFloat(text, 32)
 		if err != nil {
 			logger.Warnw("Unexpected master volume value?", "value", text, "error", err)
 		} else {
-			denon.masterVolume = convertVolume(float32(i))
+			result.MasterVolume = convertVolume(float32(i))
 		}
 	}
+
+	return
 }
 
 func convertVolume(value float32) float32 {
@@ -99,25 +102,6 @@ func (denon *Denon) Command(command string) {
 	}
 }
 
-func (denon *Denon) watch() {
-	if denon.queryTicker != nil {
-		denon.queryTicker.Stop()
-		denon.queryTicker = nil
-	}
-
-	denon.queryTicker = time.NewTicker(time.Second * 2)
-	go denon.observe()
-}
-
-func (denon *Denon) observe() {
-	for range denon.queryTicker.C {
-		err := denon.Query()
-		if err != nil {
-			logger.Error("Failed querying Denon AVR")
-		}
-	}
-}
-
 func Discover() (denon *Denon) {
 	clients, _, _ := av1.NewAVTransport1Clients()
 
@@ -129,10 +113,8 @@ func Discover() (denon *Denon) {
 	}
 
 	avr := clients[0]
-	fmt.Printf("r: %#v\n", avr.Location.Hostname())
 
 	denon = &Denon{hostname: avr.Location.Hostname()}
-
-	denon.watch()
+	logger.Infow("Discovered Denon AVR", "address", denon.hostname)
 	return
 }
