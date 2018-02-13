@@ -72,7 +72,9 @@ func main() {
 		// There's no message here. This is the signal the panel sends when it powers up and gets network.
 		// This signal is a strong indicator that I just sat down and probably want some things to power on.
 
-		cmd := exec.Command("ipmiutil", "power", "-N", "pork-ipmi", "-u", "-U", "root", "-P", os.ExpandEnv("ipmipass"))
+		args := []string{"power", "-N", "pork-ipmi", "-u", "-U", "root", "-P", os.ExpandEnv("${ipmipass}")}
+		logger.Infow("Sending ipmiutil", "args", args)
+		cmd := exec.Command("ipmiutil", args...)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		cmd.Run()
