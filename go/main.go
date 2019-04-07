@@ -4,7 +4,7 @@ import (
 	"os"
 	"time"
 
-	"./denon"
+	"github.com/jordansissel/officecontrol/go/denon"
 	"go.uber.org/zap"
 )
 
