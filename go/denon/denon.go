@@ -2,7 +2,6 @@ package denon
 
 import (
 	"encoding/xml"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -42,7 +41,7 @@ func (denon *Denon) Query() (DenonStatus, error) {
 	response, err := http.Get(endpoint.String())
 
 	if err != nil {
-		logger.Errorw("Failed sending command to Denon AVR", "endpoint", endpoint)
+		logger.Errorw("Failed sending command to Denon AVR", "endpoint", endpoint, "error", err)
 		return DenonStatus{}, err
 	}
 
@@ -108,13 +107,19 @@ func Discover() (denon *Denon) {
 	// XXX: Verify if the AV1 location is a valid Denon AVR.
 	// XXX: This can be done by fetching the Location (description.xml) and looking for AVR in the modelName.
 	if len(clients) == 0 {
-		fmt.Println("no Av1 clients found on network?")
+		logger.Infow("no Av1 clients found on network?")
 		return
 	}
 
-	avr := clients[0]
+	for _, c := range clients {
+		logger.Infow("Av1 Client", "device", c.RootDevice.Device.Manufacturer)
+		if c.RootDevice.Device.Manufacturer == "Denon" {
+			denon = &Denon{hostname: c.Location.Hostname()}
+			logger.Infow("Discovered Denon AVR", "address", denon.hostname, "device", c.RootDevice.Device.FriendlyName)
+			return
+		}
+	}
 
-	denon = &Denon{hostname: avr.Location.Hostname()}
-	logger.Infow("Discovered Denon AVR", "address", denon.hostname)
-	return
+	logger.Infow("No denon found")
+	return nil
 }
