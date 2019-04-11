@@ -25,8 +25,4 @@ func main() {
 			time.Sleep(1 * time.Second)
 		}
 	}
-	//avrQueue <- "PWON" // Power on
-	//avrQueue <- "SICD" // Set Input to GAME
-	//avrQueue <- "MV50" // Set master volume to 50
-
 }
