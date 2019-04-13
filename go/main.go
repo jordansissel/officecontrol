@@ -25,4 +25,13 @@ func main() {
 			time.Sleep(1 * time.Second)
 		}
 	}
+
+	status, err := avr.Query()
+
+	if err != nil {
+		logger.Errorw("Failed to query Denon current status", "error", err)
+		os.Exit(1)
+	}
+
+	logger.Infow("Status", "power", status.Power, "volume", status.Volume, "input", status.Input.Name)
 }
