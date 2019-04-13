@@ -1,10 +1,7 @@
 package main
 
 import (
-	"os"
-	"time"
-
-	"github.com/jordansissel/officecontrol/go/denon"
+	"github.com/jordansissel/officecontrol/go/cmd"
 	"go.uber.org/zap"
 )
 
@@ -17,21 +14,5 @@ func init() {
 }
 
 func main() {
-	avr := denon.Discover()
-
-	for i, command := range os.Args[1:] {
-		avr.Command(command)
-		if i+1 < len(os.Args[1:]) {
-			time.Sleep(1 * time.Second)
-		}
-	}
-
-	status, err := avr.Query()
-
-	if err != nil {
-		logger.Errorw("Failed to query Denon current status", "error", err)
-		os.Exit(1)
-	}
-
-	logger.Infow("Status", "power", status.Power, "volume", status.Volume, "input", status.Input.Name)
+	cmd.Execute()
 }

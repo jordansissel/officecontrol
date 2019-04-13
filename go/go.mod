@@ -6,8 +6,11 @@ require (
 	github.com/MakeNowJust/hotkey v0.0.0-20140702135330-cd480c118d16
 	github.com/eclipse/paho.mqtt.golang v1.1.1
 	github.com/huin/goupnp v1.0.0
+	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/lxn/walk v0.0.0-20190329082019-79c445caf3e9
 	github.com/lxn/win v0.0.0-20190311093451-0040366d7450
+	github.com/spf13/cobra v0.0.3
+	github.com/spf13/pflag v1.0.3 // indirect
 	go.uber.org/atomic v1.3.2 // indirect
 	go.uber.org/multierr v1.1.0 // indirect
 	go.uber.org/zap v1.9.1
