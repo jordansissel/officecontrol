@@ -155,9 +155,21 @@ func (denon *Denon) Command(command string) {
 	}
 }
 
+func New(hostname string) *Denon {
+	return &Denon{hostname: hostname}
+}
+
 // Discover uses network discovery find a neighboring Denon AVR devices.
 func Discover() (denon *Denon) {
-	clients, _, _ := av1.NewAVTransport1Clients()
+	clients, errs, err := av1.NewAVTransport1Clients()
+	if len(errs) > 0 {
+		for _, e := range errs {
+			logger.Infow("Error", "error", e)
+		}
+	}
+	if err != nil {
+		logger.Infow("Error", "error", err)
+	}
 
 	if len(clients) == 0 {
 		logger.Infow("no Av1 clients found on network?")

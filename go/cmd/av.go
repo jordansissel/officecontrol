@@ -15,12 +15,21 @@ var avCmd = &cobra.Command{
 	Args:  cobra.ArbitraryArgs,
 }
 
+var denonAddress string
+
 func init() {
 	rootCmd.AddCommand(avCmd)
+
+	avCmd.Flags().StringVarP(&denonAddress, "denon-address", "", "", "Denon AVR address if you don't want to use network discovery")
 }
 
 func avRun(cmd *cobra.Command, args []string) {
-	avr := denon.Discover()
+	var avr *denon.Denon
+	if denonAddress == "" {
+		avr = denon.Discover()
+	} else {
+		avr = denon.New(denonAddress)
+	}
 
 	if len(args) == 0 {
 		status, err := avr.Query()
